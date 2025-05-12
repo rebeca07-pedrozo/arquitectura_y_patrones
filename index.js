@@ -29,3 +29,10 @@ exports.handler = async (event) => {
         };
     }
 };
+
+//json para pruebas 
+{
+  "nombre": "Juan Pérez",
+  "correo": "juan@example.com",
+  "mensaje": "Excelente servicio, gracias!"
+}
