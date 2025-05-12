@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Lista de Tareas</title>
+</head>
+<body>
+<h1>Tareas colaborativas</h1>
+<form th:action="@{/tareas}" method="post">
+    Descripción: <input type="text" name="descripcion" required><br>
+    Asignado a: <input type="text" name="asignadoA" required><br>
+    <input type="submit" value="Agregar Tarea">
+</form>
+
+<h2>Listado</h2>
+<ul>
+    <li th:each="tarea : ${tareas}">
+        <span th:text="${tarea.descripcion}"></span> -
+        <em th:text="${tarea.asignadoA}"></em>
+        <strong th:if="${tarea.completada}">(✔)</strong>
+    </li>
+</ul>
+</body>
+</html>
