@@ -1,0 +1,443 @@
+import java.util.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+//6. E-commerce
+class Producto 
+{
+    private int id;
+    private String nombre;
+    private double precio;
+
+    public Producto(int id, String nombre, double precio) 
+    {
+        this.id = id;
+        this.nombre = nombre;
+        this.precio = precio;
+    }
+
+    public int getId() 
+    {
+        return id;
+    }
+
+    public String getNombre() 
+    {
+        return nombre;
+    }
+
+    public double getPrecio() 
+    {
+        return precio;
+    }
+
+    @Override
+    public String toString() 
+    {
+        return "Producto{" +
+                "id=" + id +
+                ", nombre='" + nombre + '\'' +
+                ", precio=" + precio +
+                '}';
+    }
+}
+
+class Orden 
+{
+    private int id;
+    private int clienteId;
+    private List<Producto> productos;
+    private String estado;
+
+    public Orden(int id, int clienteId, List<Producto> productos, String estado) 
+    {
+        this.id = id;
+        this.clienteId = clienteId;
+        this.productos = productos;
+        this.estado = estado;
+    }
+
+    public int getId() 
+    {
+        return id;
+    }
+
+    public int getClienteId() 
+    {
+        return clienteId;
+    }
+
+    public List<Producto> getProductos() 
+    {
+        return productos;
+    }
+
+    public String getEstado() 
+    {
+        return estado;
+    }
+
+    public void setEstado(String estado) 
+    {
+        this.estado = estado;
+    }
+
+    public double getTotal() 
+    {
+        double total = 0;
+        for (Producto producto : productos) 
+        {
+            total += producto.getPrecio();
+        }
+        return total;
+    }
+
+    @Override
+    public String toString() 
+    {
+        return "Orden{" +
+                "id=" + id +
+                ", clienteId=" + clienteId +
+                ", productos=" + productos +
+                ", estado='" + estado + '\'' +
+                '}';
+    }
+}
+
+class Cliente 
+{
+    private int id;
+    private String nombre;
+    private String email;
+
+    public Cliente(int id, String nombre, String email) 
+    {
+        this.id = id;
+        this.nombre = nombre;
+        this.email = email;
+    }
+
+    public int getId() 
+    {
+        return id;
+    }
+
+    public String getNombre() 
+    {
+        return nombre;
+    }
+
+    public String getEmail() 
+    {
+        return email;
+    }
+
+    @Override
+    public String toString() 
+    {
+        return "Cliente{" +
+                "id=" + id +
+                ", nombre='" + nombre + '\'' +
+                ", email='" + email + '\'' +
+                '}';
+    }
+}
+
+class ServicioDeOrdenes 
+{
+    private RepositorioDeOrdenes repositorioDeOrdenes;
+    private PasarelaDePago pasarelaDePago;
+
+    public ServicioDeOrdenes(RepositorioDeOrdenes repositorioDeOrdenes, PasarelaDePago pasarelaDePago) 
+    {
+        this.repositorioDeOrdenes = repositorioDeOrdenes;
+        this.pasarelaDePago = pasarelaDePago;
+    }
+
+    public Orden crearOrden(int clienteId, List<Producto> productos) 
+    {
+        //Aquí iría la lógica para crear una orden
+        
+        //Ejemplo de uso del repositorio
+        int ordenId = repositorioDeOrdenes.obtenerSiguienteId(); 
+        Orden orden = new Orden(ordenId, clienteId, productos, "pendiente");
+        repositorioDeOrdenes.guardar(orden);
+        return orden;
+    }
+
+    public Orden procesarPago(int ordenId, Map<String, String> detallesDePago) 
+    {
+        Orden orden = repositorioDeOrdenes.obtenerPorId(ordenId);
+        if (!orden.getEstado().equals("pendiente"))
+        {
+            throw new RuntimeException("La orden ya ha sido pagada");
+        }
+        //Excepción para que la capa superior la maneje, como por ejemplo el controlador
+        try 
+        {
+            pasarelaDePago.procesarPago(orden, detallesDePago);
+            orden.setEstado("pagada");
+            repositorioDeOrdenes.guardar(orden);
+            return orden;
+        } 
+        catch (Exception e) 
+        {
+            orden.setEstado("pago_fallido");
+            repositorioDeOrdenes.guardar(orden);
+            throw e; 
+        }
+    }
+
+    public Orden cancelarOrden(int ordenId) 
+    {
+        Orden orden = repositorioDeOrdenes.obtenerPorId(ordenId);
+        if (orden.getEstado().equals("enviada") || orden.getEstado().equals("entregada")) 
+        {
+            throw new RuntimeException("No se puede cancelar una orden que ya ha sido enviada o entregada");
+        }
+        orden.setEstado("cancelada");
+        repositorioDeOrdenes.guardar(orden);
+        return orden;
+    }
+
+}
+
+//Puertos
+interface RepositorioDeOrdenes 
+{
+    Orden obtenerPorId(int ordenId);
+
+    void guardar(Orden orden);
+
+    int obtenerSiguienteId();
+}
+
+interface PasarelaDePago 
+{
+    void procesarPago(Orden orden, Map<String, String> detallesDePago);
+
+    void reembolsarPago(String pagoId);
+}
+
+//Adaptadores
+class AdaptadorDeBaseDeDatosDeOrdenes implements RepositorioDeOrdenes 
+{
+    //Aquí iría la lógica para interactuar con la base de datos
+    //Simulacion de la conexion
+    private String dbConnection; 
+
+    public AdaptadorDeBaseDeDatosDeOrdenes(String dbConnection) 
+    {
+        this.dbConnection = dbConnection;
+    }
+
+    @Override
+    public Orden obtenerPorId(int ordenId) 
+    {
+        //Aquí iría la lógica para obtener una orden de la base de datos
+        System.out.println("Obteniendo orden con ID " + ordenId + " de la base de datos");
+        //Simulación de una base de datos
+        if (ordenId == 1) 
+        {
+            List<Producto> productosSimulados = Arrays.asList(
+                    new Producto(101, "Producto A", 25.00),
+                    new Producto(102, "Producto B", 50.00)
+            );
+            Cliente clienteSimulado = new Cliente(1, "Juan Perez", "juan.perez@labuena.com");
+            return new Orden(1, clienteSimulado.getId(), productosSimulados, "pagada");
+        } 
+        else if (ordenId == 2) 
+        {
+            List<Producto> productosSimulados = Collections.singletonList(new Producto(201, "Producto C", 100.00));
+            Cliente clienteSimulado = new Cliente(2, "Maria Gomez", "maria.gomez@labuena.com");
+            return new Orden(2, clienteSimulado.getId(), productosSimulados, "pendiente");
+        } 
+        else 
+        {
+            return null; 
+        }
+    }
+
+    @Override
+    public void guardar(Orden orden) 
+    {
+        //Aquí iría la lógica para guardar una orden en la base de datos
+        System.out.println("Guardando orden con ID " + orden.getId() + " en la base de datos");
+        System.out.println("Estado de la orden: " + orden.getEstado());
+    }
+
+    @Override
+    public int obtenerSiguienteId() 
+    {
+        //Simulacion de obtener el siguiente ID de la secuencia de la BD
+        System.out.println("Obteniendo el siguiente ID de la secuencia de la base de datos");
+        return 3; // Simulando que el siguiente ID es 3
+    }
+}
+
+class AdaptadorDePasarelaDePagoStripe implements PasarelaDePago 
+{
+    //Aquí iría la lógica para interactuar con la API de Stripe
+    @Override
+    public void procesarPago(Orden orden, Map<String, String> detallesDePago) 
+    {
+        //Aqí iría la lógica para procesar el pago con Stripe
+        System.out.println("Procesando pago de " + orden.getTotal() + " para la orden " + orden.getId() + " con Stripe: " + detallesDePago);
+        //Simulación de la respuesta de Stripe
+        if (detallesDePago.get("numero_tarjeta").equals("invalido")) 
+        {
+            throw new RuntimeException("Tarjeta de crédito inválida");
+        }
+    }
+
+    @Override
+    public void reembolsarPago(String pagoId) 
+    {
+        //Aquí iría la lógica para reembolsar un pago con Stripe
+        //Simulacion
+        System.out.println("Reembolsando pago " + pagoId + " con Stripe");
+    }
+}
+
+class AdaptadorDePasarelaDePagoPayPal implements PasarelaDePago 
+{
+    //Aquí iría la lógica para interactuar con la API de PayPal
+    //Simulacion
+    @Override
+    public void procesarPago(Orden orden, Map<String, String> detallesDePago) 
+    {
+        System.out.println("Procesando pago de " + orden.getTotal() + " para la orden " + orden.getId() + " con PayPal: " + detallesDePago);
+    }
+
+    @Override
+    public void reembolsarPago(String pagoId) 
+    {
+        //Aquí iría la lógica para reembolsar un pago con PayPal
+        //Simulacion
+        System.out.println("Reembolsando pago " + pagoId + " con PayPal");
+    }
+}
+
+//Controlador
+class ControladorRESTDeOrdenes 
+{
+    private ServicioDeOrdenes servicioDeOrdenes;
+
+    public ControladorRESTDeOrdenes(ServicioDeOrdenes servicioDeOrdenes) 
+    {
+        this.servicioDeOrdenes = servicioDeOrdenes;
+    }
+
+    public Map<String, Object> crearOrden(Map<String, Object> request) 
+    {
+        //Aquí iría la lógica para extraer los datos de la solicitud HTTP
+        //Simulacion de la obtencion de los productos
+        int clienteId = (int) request.get("cliente_id");
+        List<Integer> productoIds = (List<Integer>) request.get("producto_ids");
+        
+        List<Producto> productos = new ArrayList<>();
+        for (Integer prodId : productoIds) 
+        {
+            productos.add(new Producto(prodId, "Producto " + prodId, prodId * 10));
+        }
+        Orden orden = servicioDeOrdenes.crearOrden(clienteId, productos);
+        Map<String, Object> respuesta = new HashMap<>();
+        respuesta.put("orden_id", orden.getId());
+        respuesta.put("estado", orden.getEstado());
+        return respuesta;
+    }
+
+    public Map<String, Object> procesarPago(Map<String, Object> request) 
+    {
+        int ordenId = (int) request.get("orden_id");
+        Map<String, String> detallesDePago = (Map<String, String>) request.get("detalles_de_pago");
+        try 
+        {
+            Orden orden = servicioDeOrdenes.procesarPago(ordenId, detallesDePago);
+            Map<String, Object> respuesta = new HashMap<>();
+            respuesta.put("orden_id", orden.getId());
+            respuesta.put("estado", orden.getEstado());
+            return respuesta;
+        } 
+        catch (RuntimeException e) 
+        {
+            Map<String, Object> respuesta = new HashMap<>();
+            respuesta.put("error", e.getMessage());
+            return respuesta;
+        }
+    }
+
+    public Map<String, Object> cancelarOrden(Map<String, Object> request) 
+    {
+        int ordenId = (int) request.get("orden_id");
+        try 
+        {
+            Orden orden = servicioDeOrdenes.cancelarOrden(ordenId);
+            Map<String, Object> respuesta = new HashMap<>();
+            respuesta.put("orden_id", orden.getId());
+            respuesta.put("estado", orden.getEstado());
+            return respuesta;
+        } 
+        catch (RuntimeException e) 
+        {
+            Map<String, Object> respuesta = new HashMap<>();
+            respuesta.put("error", e.getMessage());
+            return respuesta;
+        }
+    }
+}
+
+//Uso de la Arquitectura Hexagonal
+public class Main 
+{
+    public static void main(String[] args) 
+    {
+        //Inicialización de las dependencias
+        String dbConnection = "conexion_a_la_base_de_datos"; //Simulacion
+        RepositorioDeOrdenes repositorioDeOrdenes = new AdaptadorDeBaseDeDatosDeOrdenes(dbConnection);
+        //PasarelaDePago pasarelaDePago = new AdaptadorDePasarelaDePagoStripe();  //Esta es para usar Stripe
+        PasarelaDePago pasarelaDePago = new AdaptadorDePasarelaDePagoPayPal();  //Esta es para usar PayPal
+        ServicioDeOrdenes servicioDeOrdenes = new ServicioDeOrdenes(repositorioDeOrdenes, pasarelaDePago);
+        ControladorRESTDeOrdenes controladorOrdenes = new ControladorRESTDeOrdenes(servicioDeOrdenes);
+
+        //Simulación de una solicitud HTTP
+        Map<String, Object> requestCrearOrden = new HashMap<>();
+        requestCrearOrden.put("cliente_id", 1);
+        requestCrearOrden.put("producto_ids", Arrays.asList(101, 102));
+
+        Map<String, Object> requestProcesarPago = new HashMap<>();
+        requestProcesarPago.put("orden_id", 2);
+        Map<String, String> detallesDePago = new HashMap<>();
+        detallesDePago.put("numero_tarjeta", "1234567890");
+        detallesDePago.put("fecha_expiracion", "12/24");
+        detallesDePago.put("cvv", "123");
+        requestProcesarPago.put("detalles_de_pago", detallesDePago);
+
+        Map<String, Object> requestProcesarPagoInvalido = new HashMap<>();
+        requestProcesarPagoInvalido.put("orden_id", 2);
+        Map<String, String> detallesDePagoInvalido = new HashMap<>();
+        detallesDePagoInvalido.put("numero_tarjeta", "invalido");
+        detallesDePagoInvalido.put("fecha_expiracion", "12/24");
+        detallesDePagoInvalido.put("cvv", "123");
+        requestProcesarPagoInvalido.put("detalles_de_pago", detallesDePagoInvalido);
+
+        Map<String, Object> requestCancelarOrden = new HashMap<>();
+        requestCancelarOrden.put("orden_id", 1);
+
+        //Simulación del manejo de la solicitud por el controlador
+        Map<String, Object> respuestaCrearOrden = controladorOrdenes.crearOrden(requestCrearOrden);
+        System.out.println("Respuesta Crear Orden: " + respuestaCrearOrden);
+
+        Map<String, Object> respuestaProcesarPago = controladorOrdenes.procesarPago(requestProcesarPago);
+        System.out.println("Respuesta Procesar Pago: " + respuestaProcesarPago);
+
+        Map<String, Object> respuestaProcesarPagoInvalido = controladorOrdenes.procesarPago(requestProcesarPagoInvalido);
+        System.out.println("Respuesta Procesar Pago Invalido: " + respuestaProcesarPagoInvalido);
+
+        Map<String, Object> respuestaCancelarOrden = controladorOrdenes.cancelarOrden(requestCancelarOrden);
+        System.out.println("Respuesta Cancelar Orden: " + respuestaCancelarOrden);
+    }
+}
