@@ -1,0 +1,238 @@
+// 8. Componente de Autenticación
+
+        //Capa de Presentación
+        class ControladorDeAutenticacion 
+        {
+            private ServicioDeAutenticacion servicioDeAutenticacion;
+
+            public ControladorDeAutenticacion(ServicioDeAutenticacion servicioDeAutenticacion) 
+            {
+                this.servicioDeAutenticacion = servicioDeAutenticacion;
+            }
+
+            public Map<String, Object> iniciarSesion(Map<String, String> request) {
+                //Simulación de la extracción de datos de la solicitud
+                String nombreUsuario = request.get("nombre_usuario");
+                String contrasena = request.get("contrasena");
+                try 
+                {
+                    String token = servicioDeAutenticacion.iniciarSesion(nombreUsuario, contrasena);
+                    Map<String, Object> respuesta = new HashMap<>();
+                    respuesta.put("token", token);
+                    return respuesta;
+                } 
+                catch (RuntimeException e) 
+                {
+                    Map<String, Object> respuesta = new HashMap<>();
+                    respuesta.put("error", e.getMessage());
+                    return respuesta;
+                }
+            }
+
+            public Map<String, Object> registrarUsuario(Map<String, String> request) 
+            {
+                String nombreUsuario = request.get("nombre_usuario");
+                String contrasena = request.get("contrasena");
+                String email = request.get("email");
+                try 
+                {
+                    Usuario usuario = servicioDeAutenticacion.registrarUsuario(nombreUsuario, contrasena, email);
+                    Map<String, Object> respuesta = new HashMap<>();
+                    respuesta.put("usuario_id", usuario.getId());
+                    respuesta.put("nombre_usuario", usuario.getNombreUsuario());
+                    respuesta.put("email", usuario.getEmail());
+                    return respuesta;
+                } 
+                catch (RuntimeException e) 
+                {
+                    Map<String, Object> respuesta = new HashMap<>();
+                    respuesta.put("error", e.getMessage());
+                    return respuesta;
+                }
+            }
+        }
+
+        //Capa de Lógica de Negocio
+        class ServicioDeAutenticacion 
+        {
+            private RepositorioDeUsuarios repositorioDeUsuarios;
+
+            public ServicioDeAutenticacion(RepositorioDeUsuarios repositorioDeUsuarios) 
+            {
+                this.repositorioDeUsuarios = repositorioDeUsuarios;
+            }
+
+            public String iniciarSesion(String nombreUsuario, String contrasena) 
+            {
+                Usuario usuario = repositorioDeUsuarios.obtenerPorNombreUsuario(nombreUsuario);
+                if (usuario == null) 
+                {
+                    throw new RuntimeException("Usuario no encontrado");  //Excepción personalizada
+                }
+                if (!verificarContrasena(contrasena, usuario.getContrasenaHash())) 
+                {
+                    throw new RuntimeException("Contraseña incorrecta");  //Excepción personalizada
+                }
+                //Generar token
+                String token = generarToken(usuario);
+                return token;
+            }
+
+            public Usuario registrarUsuario(String nombreUsuario, String contrasena, String email) 
+            {
+                if (repositorioDeUsuarios.obtenerPorNombreUsuario(nombreUsuario) != null) 
+                {
+                    throw new RuntimeException("Nombre de usuario ya existe");
+                }
+                String contrasenaHash = hashearContrasena(contrasena);
+                Usuario usuario = new Usuario(0, nombreUsuario, contrasenaHash, email); 
+                repositorioDeUsuarios.guardar(usuario);
+                return usuario;
+            }
+
+            private boolean verificarContrasena(String contrasena, String contrasenaHash) 
+            {
+                //Aquí iría la lógica para verificar la contraseña
+                //Simulacion
+                System.out.println("Verificando contraseña...");
+                return contrasena.equals(contrasenaHash); 
+            }
+
+            private String generarToken(Usuario usuario) 
+            {
+                //Aquí iría la lógica para generar un token
+                //Simulación
+                System.out.println("Generando token JWT...");
+                return "token_jwt_para_" + usuario.getNombreUsuario();  
+            }
+            private String hashearContrasena(String contrasena)
+            {
+                return contrasena;
+            }
+        }
+
+        //Capa de Acceso a Datos
+        interface RepositorioDeUsuarios 
+        {
+            Usuario obtenerPorNombreUsuario(String nombreUsuario);
+            void guardar(Usuario usuario);
+        }
+
+        class AdaptadorDeBaseDeDatosDeUsuarios implements RepositorioDeUsuarios 
+        {
+          private String dbConnection;
+
+            public AdaptadorDeBaseDeDatosDeUsuarios(String dbConnection) 
+            {
+                this.dbConnection = dbConnection;
+            }
+            @Override
+            public Usuario obtenerPorNombreUsuario(String nombreUsuario) 
+            {
+                //Simulación de la consulta a la base de datos
+                System.out.println("Obteniendo usuario " + nombreUsuario + " dela base de datos");
+                if (nombreUsuario.equals("juan.perez")) 
+                {
+                    return new Usuario(1, "juan.perez", "contrasena_hasheada", "juan.perez@labuena.com");
+                } 
+                else if (nombreUsuario.equals("maria.gomez")) 
+                {
+                    return new Usuario(2, "maria.gomez", "otra_contrasena", "maria.gomez@labuena.com");
+                } 
+                else 
+                {
+                    return null;
+                }
+            }
+
+            @Override
+            public void guardar(Usuario usuario) 
+            {
+                //Simulación de guardar un usuario en la base de datos
+                System.out.println("Guardando usuario " + usuario.getNombreUsuario() + " en la base de datos");
+                if (usuario.getId() == 0) 
+                {
+                   usuario.setId(3); //Simulando la generacion del ID
+                }
+            }
+        }
+
+        //Entidades
+        class Usuario 
+        {
+            private int id;
+            private String nombreUsuario;
+            private String contrasenaHash;
+            private String email;
+
+            public Usuario(int id, String nombreUsuario, String contrasenaHash, String email) 
+            {
+                this.id = id;
+                this.nombreUsuario = nombreUsuario;
+                this.contrasenaHash = contrasenaHash;
+                this.email = email;
+            }
+
+             public int getId() 
+             {
+                return id;
+            }
+
+            public void setId(int id) 
+            {
+                this.id = id;
+            }
+
+            public String getNombreUsuario() 
+            {
+                return nombreUsuario;
+            }
+
+            public String getContrasenaHash() 
+            {
+                return contrasenaHash;
+            }
+
+            public String getEmail() 
+            {
+                return email;
+            }
+        }
+
+        //Uso del Componente de Autenticación
+        //Inicialización de dependencias
+        String dbConnectionAut = "conexion_a_la_base_de_datos";
+        RepositorioDeUsuarios repositorioDeUsuarios = new AdaptadorDeBaseDeDatosDeUsuarios(dbConnectionAut);
+        ServicioDeAutenticacion servicioDeAutenticacion = new ServicioDeAutenticacion(repositorioDeUsuarios);
+        ControladorDeAutenticacion controladorDeAutenticacion = new ControladorDeAutenticacion(servicioDeAutenticacion);
+
+        //Simulación de solicitudes
+        Map<String, String> requestInicioSesionExito = new HashMap<>();
+        requestInicioSesionExito.put("nombre_usuario", "juan.perez");
+        requestInicioSesionExito.put("contrasena", "contrasena_hasheada");
+
+        Map<String, String> requestInicioSesionFallido = new HashMap<>();
+        requestInicioSesionFallido.put("nombre_usuario", "juan.perez");
+        requestInicioSesionFallido.put("contrasena", "contrasena_incorrecta");
+
+        Map<String, String> requestInicioSesionUsuarioNoExiste = new HashMap<>();
+        requestInicioSesionUsuarioNoExiste.put("nombre_usuario", "no_existe");
+        requestInicioSesionUsuarioNoExiste.put("contrasena", "cualquier_contrasena");
+
+        Map<String, String> requestRegistroUsuario = new HashMap<>();
+        requestRegistroUsuario.put("nombre_usuario", "maria.gomez");
+        requestRegistroUsuario.put("contrasena", "contrasena123");
+        requestRegistroUsuario.put("email", "maria.gomez@labuena.com");
+
+        //Simulación de llamadas al controlador
+        Map<String, Object> respuestaInicioSesionExito = controladorDeAutenticacion.iniciarSesion(requestInicioSesionExito);
+        System.out.println("Respuesta Inicio de Sesión Éxito: " + respuestaInicioSesionExito);
+
+        Map<String, Object> respuestaInicioSesionFallido = controladorDeAutenticacion.iniciarSesion(requestInicioSesionFallido);
+        System.out.println("Respuesta Inicio de Sesión Fallido: " + respuestaInicioSesionFallido);
+
+        Map<String, Object> respuestaInicioSesionUsuarioNoExiste = controladorDeAutenticacion.iniciarSesion(requestInicioSesionUsuarioNoExiste);
+        System.out.println("Respuesta Inicio de Sesión Usuario No Existe: " + respuestaInicioSesionUsuarioNoExiste);
+
+        Map<String, Object> respuestaRegistroUsuario = controladorDeAutenticacion.registrarUsuario(requestRegistroUsuario);
+        System.out.println("Respuesta Registro Usuario: " + respuestaRegistroUsuario);
