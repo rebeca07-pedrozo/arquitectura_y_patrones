@@ -1,0 +1,137 @@
+//7. Notificación de Aceptación de Viaje
+
+        //Simulación usando una cola
+        class BrokerDeEventos 
+        {
+            private BlockingQueue<Evento> cola = new LinkedBlockingQueue<>();
+            private Map<String, List<ConsumidorDeEventos>> suscriptores = new HashMap<>();
+
+            public void publicar(Evento evento) 
+            {
+                System.out.println("Evento publicado: " + evento.getNombre());
+                cola.add(evento);
+                notificarSuscriptores(evento);
+            }
+
+            public void suscribir(String nombreEvento, ConsumidorDeEventos consumidor) 
+            {
+                if (!suscriptores.containsKey(nombreEvento)) 
+                {
+                    suscriptores.put(nombreEvento, new ArrayList<>());
+                }
+                suscriptores.get(nombreEvento).add(consumidor);
+            }
+
+            private void notificarSuscriptores(Evento evento) 
+            {
+                if (suscriptores.containsKey(evento.getNombre())) 
+                {
+                    //Usamos ExecutorService para manejar hilos
+                    ExecutorService executor = Executors.newCachedThreadPool();
+                    for (ConsumidorDeEventos consumidor : suscriptores.get(evento.getNombre())) 
+                    {
+                        executor.submit(() -> consumidor.manejarEvento(evento)); //Se ejecuta cada consumidor en un hilo
+                    }
+                    executor.shutdown();
+                }
+            }
+            //Metodo para que los consumidores obtengan eventos
+            public Evento consumirEventos() throws InterruptedException 
+            { 
+                return cola.take();
+            }
+        }
+
+        //Eventos
+        class Evento 
+        {
+            private String nombre;
+            private Map<String, Object> datos;
+
+            public Evento(String nombre, Map<String, Object> datos) 
+            {
+                this.nombre = nombre;
+                this.datos = datos;
+            }
+
+            public String getNombre() 
+            {
+                return nombre;
+            }
+
+            public Map<String, Object> getDatos() 
+            {
+                return datos;
+            }
+        }
+
+        //Consumidores de Eventos
+        interface ConsumidorDeEventos 
+        {
+            void manejarEvento(Evento evento);
+        }
+
+        //Productores de Eventos
+        class ServicioConductor 
+        {
+            private BrokerDeEventos brokerDeEventos;
+
+            public ServicioConductor(BrokerDeEventos brokerDeEventos) 
+            {
+                this.brokerDeEventos = brokerDeEventos;
+            }
+
+            public void aceptarViaje(int idViaje, int idConductor, int idPasajero) 
+            {
+                //Simulación de la lógica de negocio
+                System.out.println("Conductor " + idConductor + " aceptó el viaje " + idViaje);
+                Map<String, Object> datos = new HashMap<>();
+                datos.put("id_viaje", idViaje);
+                datos.put("id_conductor", idConductor);
+                datos.put("id_pasajero", idPasajero);
+                datos.put("hora_aceptacion", java.time.LocalTime.now().toString());
+                Evento evento = new Evento("ConductorAceptoViaje", datos);
+                brokerDeEventos.publicar(evento);
+            }
+        }
+
+        class ServicioNotificaciones implements ConsumidorDeEventos 
+        {
+            @Override
+            public void manejarEvento(Evento evento) 
+            {
+                if (evento.getNombre().equals("ConductorAceptoViaje")) 
+                {
+                    int idPasajero = (int) evento.getDatos().get("id_pasajero");
+                    int idViaje = (int) evento.getDatos().get("id_viaje");
+                    String horaAceptacion = (String) evento.getDatos().get("hora_aceptacion");
+                    //Simulación del envío de la notificación
+                    System.out.println("Enviando notificación al pasajero " + idPasajero + ": El conductor aceptó el viaje " + idViaje + " a las " + horaAceptacion);
+                    //Aquí iría la lógica para enviar la notificación
+                }
+            }
+        }
+
+        class ServicioSeguimiento implements ConsumidorDeEventos 
+        {
+            public void manejarEvento(Evento evento) 
+            {
+                if (evento.getNombre().equals("ConductorAceptoViaje")) 
+                {
+                    int idViaje = (int) evento.getDatos().get("id_viaje");
+                    int idConductor = (int) evento.getDatos().get("id_conductor");
+                    System.out.println("Registrando en el servicio de seguimiento que el conductor " + idConductor + " aceptó el viaje " + idViaje);
+                }
+            }
+        }
+
+        //Uso de la Arquitectura Orientada a Eventos
+        BrokerDeEventos brokerDeEventos = new BrokerDeEventos();
+        ServicioNotificaciones servicioNotificaciones = new ServicioNotificaciones();
+        ServicioSeguimiento servicioSeguimiento = new ServicioSeguimiento();
+        brokerDeEventos.suscribir("ConductorAceptoViaje", servicioNotificaciones);
+        brokerDeEventos.suscribir("ConductorAceptoViaje", servicioSeguimiento);
+        ServicioConductor servicioConductor = new ServicioConductor(brokerDeEventos);
+
+        //Simulación de la aceptación de un viaje
+        servicioConductor.aceptarViaje(100, 200, 300);

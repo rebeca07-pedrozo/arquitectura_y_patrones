@@ -1,0 +1,141 @@
+// 9. Envío de Correos Masivos
+        class ProductorDeCorreos 
+        {
+            private final static String QUEUE_NAME = "correos_masivos";
+            private String rabbitmqHost = "localhost"; //Hay que cambiarlo cuando se tenga un servidor real de RabbitMQ
+
+            public ProductorDeCorreos(String rabbitmqHost)
+            {
+                this.rabbitmqHost = rabbitmqHost;
+            }
+            public void producirMensajesCorreo(List<Map<String, String>> correos) 
+            {
+                ConnectionFactory factory = new ConnectionFactory();
+                factory.setHost(rabbitmqHost);
+                try (Connection connection = factory.newConnection();
+                     Channel channel = connection.createChannel()) 
+                     {
+                    channel.queueDeclare(QUEUE_NAME, false, false, false, null);
+
+                    for (Map<String, String> correo : correos) {
+                        String mensaje = "Destinatario: " + correo.get("destinatario") +
+                                ", Asunto: " + correo.get("asunto") +
+                                ", Cuerpo: " + correo.get("cuerpo");
+                        channel.basicPublish("", QUEUE_NAME, null, mensaje.getBytes("UTF-8"));
+                        System.out.println(" [x] Enviado: " + mensaje);
+                    }
+                } 
+                catch (IOException | TimeoutException e) 
+                {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        class ConsumidorDeCorreos 
+        {
+            private final static String QUEUE_NAME = "correos_masivos";
+            private String rabbitmqHost = "localhost";
+            private String emailServiceHost = "smtp.example.com";
+
+             public ConsumidorDeCorreos(String rabbitmqHost, String emailServiceHost)
+             {
+                this.rabbitmqHost = rabbitmqHost;
+                this.emailServiceHost = emailServiceHost;
+            }
+
+            public void consumirMensajesCorreo() 
+            {
+                ConnectionFactory factory = new ConnectionFactory();
+                factory.setHost(rabbitmqHost);
+                try 
+                {
+                    Connection connection = factory.newConnection();
+                    Channel channel = connection.createChannel();
+                    channel.queueDeclare(QUEUE_NAME, false, false, false, null);
+
+                    DeliverCallback deliverCallback = (consumerTag, delivery) -> 
+                    {
+                        String mensaje = new String(delivery.getBody(), "UTF-8");
+                        System.out.println(" [x] Recibido: " + mensaje);
+                        enviarCorreo(mensaje); //Lógica para enviar el correo electrónico
+                        try 
+                        {
+                            channel.basicAck(delivery.getEnvelope().getDeliveryTag(), false);
+                        } 
+                        catch(IOException e)
+                        {
+                            e.printStackTrace();
+                        }
+
+                    };
+                    channel.basicConsume(QUEUE_NAME, false, "miConsumidor", deliverCallback, (consumerTag) -> 
+                    {
+                        System.out.println("Consumidor cancelado");
+                    });
+                    System.out.println(" [*] Esperando mensajes. Para salir, presione Ctrl+C");
+                }
+                catch (IOException | TimeoutException e) 
+                {
+                    e.printStackTrace();
+                }
+            }
+
+            private void enviarCorreo(String mensaje) 
+            {
+                //Simulación del envío de correo electrónico
+                System.out.println("Enviando correo electrónico a través de " + emailServiceHost + ": " + mensaje);
+                //Aquí iría la lógica para conectarse al servidor de correo y enviar el mensaje
+            }
+        }
+        //Uso de las Colas Asincrónicas
+        //Simulación de la lista de correos electrónicos a enviar
+        List<Map<String, String>> correosAEnviar = Arrays.asList(
+                new HashMap<>() 
+                {{
+                    put("destinatario", "usuario1@labuena.com");
+                    put("asunto", "Bienvenido");
+                    put("cuerpo", "¡Bienvenido a nuestra plataforma!");
+                }},
+                new HashMap<>() 
+                {{
+                    put("destinatario", "usuario2@labuena.com");
+                    put("asunto", "Oferta Especial");
+                    put("cuerpo", "Tenemos una oferta increíble para ti.");
+                }},
+                new HashMap<>() 
+                {{
+                    put("destinatario", "usuario3@labuena.com");
+                    put("asunto", "Actualización de tu cuenta");
+                    put("cuerpo", "Tu cuenta ha sido actualizada.");
+                }},
+                new HashMap<>() 
+                {{
+                    put("destinatario", "usuario4@labuena.com");
+                    put("asunto", "Recordatorio de pago");
+                    put("cuerpo", "No olvides pagar tu factura.");
+                }},
+                new HashMap<>() 
+                {{
+                    put("destinatario", "usuario5@labuenacom");
+                    put("asunto", "Encuesta de satisfacción");
+                    put("cuerpo", "Nos importa tu opinión.");
+                }}
+        );
+
+        ConsumidorDeCorreos consumidorDeCorreos = new ConsumidorDeCorreos(rabbitmq_host, "smtp.labuena.com");
+        new Thread(consumidorDeCorreos::consumirMensajesCorreo).start();
+        try 
+        {
+            Thread.sleep(1000);
+        } 
+        catch(InterruptedException e)
+        {
+            e.printStackTrace();
+        }
+
+
+        ProductorDeCorreos productorDeCorreos = new ProductorDeCorreos(rabbitmq_host);
+        productorDeCorreos.producirMensajesCorreo(correosAEnviar);
+    }
+}
