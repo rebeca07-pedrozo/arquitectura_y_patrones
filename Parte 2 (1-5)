@@ -1,0 +1,725 @@
+import java.util.*;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+//1. Patrón Singleton para la Conexión a la Base de Datos Relacional
+public class ConexionBD 
+{
+
+    private static ConexionBD instancia;
+    private Connection conexion;
+    private static final String URL = "";//Aquí iría la url del localhost de postgreSQL 
+    private static final String USUARIO = "postgres";
+    private static final String CONTRASENA = "password"; 
+
+    private ConexionBD() 
+    {
+        try 
+        {
+            //A continuación se carga el driver de PostgreSQL
+            Class.forName("");//Cuando descarguemos el driver de postgreSQL lo cargamos aquí
+            conexion = DriverManager.getConnection(URL, USUARIO, CONTRASENA);
+            System.out.println("Conexión a la base de datos establecida.");
+        }
+         catch (SQLException e) 
+        {
+            System.err.println("Error al conectar a la base de datos: " + e.getMessage());
+            throw new RuntimeException("Error al conectar a la base de datos", e);
+        } 
+        catch (ClassNotFoundException e) 
+        {
+            System.err.println("Error al cargar el driver de la base de datos: " + e.getMessage());
+            throw new RuntimeException("Error al cargar el driver de la base de datos", e);
+        }
+    }
+
+    public static ConexionBD getInstancia() 
+    {
+        //Sincronizacion para que solo un hilo cree la instancia
+        if (instancia == null) 
+        {
+            synchronized (ConexionBD.class) 
+            { 
+                if (instancia == null) 
+                {
+                    instancia = new ConexionBD();
+                }
+            }
+        }
+        return instancia;
+    }
+
+    public Connection getConexion() 
+    {
+        return conexion;
+    }
+
+   
+    public void cerrarConexion() 
+    {
+        try 
+        {
+            if (conexion != null && !conexion.isClosed()) 
+            {
+                conexion.close();
+                System.out.println("Conexión a la base de datos cerrada.");
+            }
+        } 
+        catch (SQLException e) 
+        {
+            System.err.println("Error al cerrar la conexión a la base de datos: " + e.getMessage());
+        }
+    }
+
+    //Para evitar la clonación del Singleton
+    @Override
+    protected Object clone() throws CloneNotSupportedException 
+    {
+        throw new CloneNotSupportedException();
+    }
+}
+
+/* En cuestion de eficiencia el programa evita la creación de múltiples conexiones a la base de datos,
+   lo cual hace que consuman recursos significativos. Solamente se crea una instancia y se reutiliza.
+   Y en cuestion de concurrencia, al ser una única instancia, se centraliza el acceso a la conexión,
+   lo que facilita el manejo de la concurrencia y evita problemas de estado inconsistente */
+
+
+//2. Patrón Fábrica (Factory) para la Creación de Objetos de Usuario
+interface Usuario 
+{
+    void realizarAccion();
+    String getRol();
+}
+
+class Cliente implements Usuario 
+{
+    private int id;
+    private String nombre;
+    private String email;
+
+    public Cliente(int id, String nombre, String email) 
+    {
+        this.id = id;
+        this.nombre = nombre;
+        this.email = email;
+    }
+
+    public int getId()
+    {
+        return id;
+    }
+
+    public String getNombre() 
+    {
+        return nombre;
+    }
+
+    public String getEmail()
+    {
+        return email;
+    }
+
+    @Override
+    public void realizarAccion() 
+    {
+        System.out.println("Cliente " + nombre + " realiza una compra.");
+    }
+
+     @Override
+    public String getRol() 
+    {
+        return "Cliente";
+    }
+
+    @Override
+    public String toString() 
+    {
+        return "Cliente(" +
+                "id=" + id +
+                ", nombre='" + nombre + '\'' +
+                ", email='" + email + '\'' +
+                ')';
+    }
+}
+
+class Administrador implements Usuario 
+{
+    private int id;
+    private String nombre;
+    private String email;
+
+    public Administrador(int id, String nombre, String email) 
+    {
+        this.id = id;
+        this.nombre = nombre;
+        this.email = email;
+    }
+
+     public int getId() 
+    {
+        return id;
+    }
+
+    public String getNombre() 
+    {
+        return nombre;
+    }
+
+    public String getEmail()
+    {
+        return email;
+    }
+
+    @Override
+    public void realizarAccion() 
+    {
+        System.out.println("Administrador " + nombre + " gestiona el sistema.");
+    }
+
+    @Override
+    public String getRol() 
+    {
+        return "Administrador";
+    }
+
+     @Override
+    public String toString() 
+    {
+        return "Administrador(" +
+                "id=" + id +
+                ", nombre='" + nombre + '\'' +
+                ", email='" + email + '\'' +
+                ')';
+    }
+}
+
+class Operador implements Usuario 
+{
+    private int id;
+    private String nombre;
+    private String email;
+
+    public Operador(int id, String nombre, String email) 
+    {
+        this.id = id;
+        this.nombre = nombre;
+        this.email = email;
+    }
+
+     public int getId() 
+    {
+        return id;
+    }
+
+    public String getNombre() 
+    {
+        return nombre;
+    }
+
+     public String getEmail()
+    {
+        return email;
+    }
+
+    @Override
+    public void realizarAccion() 
+    {
+        System.out.println("Operador " + nombre + " procesa pedidos.");
+    }
+
+    @Override
+    public String getRol() 
+    {
+        return "Operador";
+    }
+
+    @Override
+    public String toString() 
+    {
+        return "Operador(" +
+                "id=" + id +
+                ", nombre='" + nombre + '\'' +
+                ", email='" + email + '\'' +
+                ')';
+    }
+}
+
+class UsuarioFactory 
+{
+    public static Usuario crearUsuario(String tipo, int id, String nombre, String email) 
+    {
+        if ("Cliente".equalsIgnoreCase(tipo)) 
+        {
+            return new Cliente(id, nombre, email);
+        } 
+        else if ("Administrador".equalsIgnoreCase(tipo))
+        {
+            return new Administrador(id, nombre, email);
+        } 
+        else if ("Operador".equalsIgnoreCase(tipo)) 
+        {
+            return new Operador(id, nombre, email);
+        } 
+        else 
+        {
+            throw new IllegalArgumentException("Tipo de usuario desconocido: " + tipo);
+        }
+    }
+}
+
+//3. Patrón Abstract Factory para la Generación de Interfaces Gráficas
+interface ComponenteGrafico 
+{
+    void dibujar();
+}
+
+interface Ventana extends ComponenteGrafico 
+{
+    void mostrarTitulo(String titulo);
+}
+
+interface Boton extends ComponenteGrafico 
+{
+    void onClick(String accion);
+}
+
+class VentanaWindows implements Ventana 
+{
+    @Override
+    public void dibujar() 
+    {
+        System.out.println("Dibujando ventana de Windows");
+    }
+
+    @Override
+     public void mostrarTitulo(String titulo) 
+    {
+        System.out.println("Mostrando titulo de Windows: " + titulo);
+    }
+}
+
+class BotonWindows implements Boton 
+{
+    @Override
+    public void dibujar() 
+    {
+        System.out.println("Dibujando botón de Windows");
+    }
+
+     @Override
+    public void onClick(String accion) 
+    {
+        System.out.println("Boton de Windows clickeado: " + accion);
+    }
+}
+
+class VentanaLinux implements Ventana 
+{
+    @Override
+    public void dibujar() 
+    {
+        System.out.println("Dibujando ventana de Linux");
+    }
+     @Override
+    public void mostrarTitulo(String titulo) 
+    {
+        System.out.println("Mostrando titulo de Linux: " + titulo);
+    }
+}
+
+class BotonLinux implements Boton 
+{
+    @Override
+    public void dibujar() 
+    {
+        System.out.println("Dibujando botón de Linux");
+    }
+    @Override
+    public void onClick(String accion) 
+    {
+        System.out.println("Boton de Linux clickeado: " + accion);
+    }
+}
+
+class VentanaMac implements Ventana 
+{
+    @Override
+    public void dibujar() 
+    {
+        System.out.println("Dibujando ventana de Mac");
+    }
+    @Override
+     public void mostrarTitulo(String titulo) {
+        System.out.println("Mostrando titulo de Mac: " + titulo);
+    }
+}
+
+class BotonMac implements Boton 
+{
+    @Override
+    public void dibujar() 
+    {
+        System.out.println("Dibujando botón de Mac");
+    }
+
+    @Override
+    public void onClick(String accion) 
+    {
+        System.out.println("Boton de Mac clickeado: " + accion);
+    }
+}
+interface FabricaGUI 
+{
+    Ventana crearVentana();
+
+    Boton crearBoton();
+}
+
+
+class FabricaWindows implements FabricaGUI 
+{
+    @Override
+    public Ventana crearVentana() 
+    {
+        return new VentanaWindows();
+    }
+
+    @Override
+    public Boton crearBoton()
+    {
+        return new BotonWindows();
+    }
+}
+
+class FabricaLinux implements FabricaGUI0
+{
+    @Override
+    public Ventana crearVentana() 
+    {
+        return new VentanaLinux();
+    }
+
+    @Override
+    public Boton crearBoton() 
+    {
+        return new BotonLinux();
+    }
+}
+
+class FabricaMac implements FabricaGUI 
+{
+    @Override
+    public Ventana crearVentana() 
+    {
+        return new VentanaMac();
+    }
+
+    @Override
+    public Boton crearBoton() 
+    {
+        return new BotonMac();
+    }
+}
+
+//4. Patrón Builder para la Creación de Órdenes de Compra Complejas
+class OrdenDeCompra 
+{
+    private int id;
+    private int clienteId;
+    private List<Producto> productos;
+    private String direccionEnvio;
+    private String metodoPago;
+    private String estado; 
+    private double descuento;
+    private String comentarios;
+
+    
+    private OrdenDeCompra(int id, int clienteId, List<Producto> productos, String direccionEnvio, String metodoPago, String estado, double descuento, String comentarios) 
+    {
+        this.id = id;
+        this.clienteId = clienteId;
+        this.productos = productos;
+        this.direccionEnvio = direccionEnvio;
+        this.metodoPago = metodoPago;
+        this.estado = estado;
+        this.descuento = descuento;
+        this.comentarios = comentarios;
+    }
+    public int getId() 
+    {
+        return id;
+    }
+    public int getClienteId() 
+    {
+        return clienteId;
+    }
+    public List<Producto> getProductos() 
+    {
+        return productos;
+    }
+    public String getDireccionEnvio() 
+    {
+        return direccionEnvio;
+    }
+    public String getMetodoPago() 
+    {
+        return metodoPago;
+    }
+    public String getEstado() 
+    {
+        return estado;
+    }
+    public double getDescuento() 
+    {
+        return descuento;
+    }
+    public String getComentarios() 
+    {
+        return comentarios;
+    }
+    public double getTotal() 
+    {
+        double total = 0;
+        for (Producto producto : productos) 
+        {
+            total += producto.getPrecio();
+        }
+        return total - descuento;
+    }
+
+    @Override
+    public String toString() 
+    {
+        return "OrdenDeCompra(" +
+                "id=" + id +
+                ", clienteId=" + clienteId +
+                ", productos=" + productos +
+                ", direccionEnvio='" + direccionEnvio + '\'' +
+                ", metodoPago='" + metodoPago + '\'' +
+                ", estado='" + estado + '\'' +
+                ", descuento=" + descuento +
+                ", comentarios='" + comentarios + '\'' +
+                ')';
+    }
+
+    public static class Builder 
+    {
+        private int id;
+        private int clienteId;
+        private List<Producto> productos;
+        private String direccionEnvio;
+        private String metodoPago;
+        private String estado;
+        private double descuento;
+        private String comentarios;
+
+        public Builder(int id, int clienteId, List<Producto> productos, String direccionEnvio, String metodoPago) 
+        {
+            this.id = id;
+            this.clienteId = clienteId;
+            this.productos = productos;
+            this.direccionEnvio = direccionEnvio;
+            this.metodoPago = metodoPago;
+            this.estado = "pendiente";
+            this.descuento = 0.0;   
+            this.comentarios = "";
+        }
+        public Builder estado(String estado) 
+        {
+            this.estado = estado;
+            return this;
+        }
+        public Builder descuento(double descuento) 
+        {
+            this.descuento = descuento;
+            return this;
+        }
+        public Builder comentarios(String comentarios) 
+        {
+            this.comentarios = comentarios;
+            return this;
+        }
+        public OrdenDeCompra build() 
+        {
+            return new OrdenDeCompra(id, clienteId, productos, direccionEnvio, metodoPago, estado, descuento, comentarios);
+        }
+    }
+}
+
+// 5. Patrón Prototype para el Sistema de Registro de Logs
+abstract class LogMessage implements Cloneable 
+{
+    protected String mensaje;
+    protected Date timestamp;
+
+    public String getMensaje() 
+    {
+        return mensaje;
+    }
+
+    public Date getTimestamp() 
+    {
+        return timestamp;
+    }
+
+    public abstract void mostrarLog();
+
+    @Override
+    protected Object clone() throws CloneNotSupportedException 
+    {
+        return super.clone();
+    }
+}
+class InfoLogMessage extends LogMessage 
+{
+    public InfoLogMessage(String mensaje) 
+    {
+        this.mensaje = mensaje;
+        this.timestamp = new Date();
+    }
+
+    @Override
+    public void mostrarLog() 
+    {
+        System.out.println("[INFO] " + timestamp + ": " + mensaje);
+    }
+}
+
+class ErrorLogMessage extends LogMessage 
+{
+     public ErrorLogMessage(String mensaje) 
+    {
+        this.mensaje = mensaje;
+        this.timestamp = new Date();
+    }
+
+    @Override
+    public void mostrarLog() 
+    {
+        System.err.println("[ERROR] " + timestamp + ": " + mensaje);
+    }
+}
+
+class LogMessagePrototype 
+{
+    private Map<String, LogMessage> prototypes = new HashMap<>();
+
+    public LogMessagePrototype() 
+    {
+        //Inicialización de prototipos predefinidos
+        prototypes.put("info", new InfoLogMessage("Mensaje de información"));
+        prototypes.put("error", new ErrorLogMessage("Mensaje de error"));
+    }
+    public void registrarPrototipo(String clave, LogMessage prototipo) 
+    {
+        prototypes.put(clave, prototipo);
+    }
+    public LogMessage obtenerPrototipo(String clave, String mensaje) 
+    {
+        LogMessage prototipo = prototypes.get(clave);
+        if (prototipo == null) 
+        {
+            return null;
+        }
+        try 
+        {
+            LogMessage clon = (LogMessage) prototipo.clone();
+            if (clon instanceof InfoLogMessage)
+            {
+                 ((InfoLogMessage)clon).mensaje = mensaje; //Hay que establecer el mensaje específico
+            }
+            if (clon instanceof ErrorLogMessage)
+            {
+                 ((ErrorLogMessage)clon).mensaje = mensaje; //Hay que establecer el mensaje específico
+            }
+
+            clon.timestamp = new Date();
+            return clon;
+        } 
+        catch (CloneNotSupportedException e) 
+        {
+            e.printStackTrace();
+            return null;
+        }
+    }
+}
+
+public class Main 
+{
+    public static void main(String[] args) 
+    {
+        // 1. Patrón Singleton para la Conexión a la Base de Datos
+        ConexionBD conexionBD = ConexionBD.getInstancia();
+        Connection conexion = conexionBD.getConexion();
+        //Aquí se realizarían operaciones con la base de datos
+        System.out.println("Usando la conexión de la BD...");
+        
+        conexionBD.cerrarConexion();//Y aquí cerramos la conexion cuando ya no se necesite
+
+        //2. Patrón Fábrica para la Creación de Usuarios
+        Usuario cliente = UsuarioFactory.crearUsuario("Cliente", 1, "Juan Perez", "juan.perez@labuena.com");
+        Usuario administrador = UsuarioFactory.crearUsuario("Administrador", 2, "Maria Gomez", "maria.gomez@labuena.com");
+        Usuario operador = UsuarioFactory.crearUsuario("Operador", 3, "Carlos Rodriguez", "carlos.rodriguez@labuena.com");
+
+        System.out.println(cliente);
+        System.out.println(administrador);
+        System.out.println(operador);
+        cliente.realizarAccion();
+        administrador.realizarAccion();
+        operador.realizarAccion();
+
+        //3. Patrón Abstract Factory para la Creación de Interfaces Gráficas
+        String sistemaOperativo = "Windows"; //Cambiar para probar diferentes SOs
+        FabricaGUI fabricaGUI;
+        if ("Windows".equalsIgnoreCase(sistemaOperativo)) 
+        {
+            fabricaGUI = new FabricaWindows();
+        }
+        else if ("Linux".equalsIgnoreCase(sistemaOperativo)) 
+        {
+            fabricaGUI = new FabricaLinux();
+        } 
+        else if ("Mac".equalsIgnoreCase(sistemaOperativo)) 
+        {
+            fabricaGUI = new FabricaMac();
+        } 
+        else 
+        {
+            throw new IllegalArgumentException("Sistema operativo no soportado: " + sistemaOperativo);
+        }
+
+        Ventana ventana = fabricaGUI.crearVentana();
+        Boton boton = fabricaGUI.crearBoton();
+        ventana.mostrarTitulo("Mi Aplicación");
+        ventana.dibujar();
+        boton.dibujar();
+        boton.onClick("Click me");
+
+        //4. Patrón Builder para la Creación de Órdenes de Compra
+        OrdenDeCompra ordenDeCompra = new OrdenDeCompra.Builder(123, 456, Arrays.asList(new Producto(101, "Producto A", 25.00), new Producto(102, "Producto B", 50.00)), "Calle Principal 123", "Tarjeta de Crédito")
+                .estado("pagada")
+                .descuento(10.0)
+                .comentarios("Envío urgente")
+                .build();
+
+        System.out.println(ordenDeCompra);
+        System.out.println("Total de la orden de compra: " + ordenDeCompra.getTotal());
+
+        //5. Patrón Prototype para el Sistema de Registro de Logs
+        LogMessagePrototype logPrototype = new LogMessagePrototype();
+        LogMessage infoLog1 = logPrototype.obtenerPrototipo("info", "Inicio de la aplicación");
+        LogMessage infoLog2 = logPrototype.obtenerPrototipo("info", "Usuario autenticado");
+        LogMessage errorLog = logPrototype.obtenerPrototipo("error", "Error al procesar el pago");
+
+        infoLog1.mostrarLog();
+        infoLog2.mostrarLog();
+        errorLog.mostrarLog();
+    }
+}
